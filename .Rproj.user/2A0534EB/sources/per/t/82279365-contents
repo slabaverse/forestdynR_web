@@ -1,0 +1,272 @@
+library(shiny)
+library(readxl)
+library(forestdynR)
+library(shinydashboard)
+library(DT)
+library(leaflet)
+library(ggplot2)
+library(factoextra)
+
+
+ui <- fluidPage(
+    dashboardPage(
+        dashboardHeader(title = "Forest Dynamics App"),
+        dashboardSidebar(
+            sidebarMenu(
+                menuItem("Upload", tabName = "upload", icon = icon("upload")),
+                menuItem("Report", tabName = "report", icon = icon("chart-bar")),
+                menuItem("PCA", tabName = "pca", icon = icon("chart-line")) # Nova aba PCA
+            )
+        ),
+        dashboardBody(
+            tabItems(
+                # Aba Upload
+                tabItem(
+                    tabName = "upload",
+                    sidebarLayout(
+                        sidebarPanel(
+                            fileInput("file1", "Escolha um arquivo (.csv ou .xlsx)",
+                                      accept = c(".csv", ".xlsx")),
+                            numericInput("latitude", "Latitude:", value = 0, step = 0.0001),
+                            numericInput("longitude", "Longitude:", value = 0, step = 0.0001),
+                            numericInput("inv_time", "Intervalo de Tempo (inteiro):", value = 1, min = 1, step = 1),
+                            actionButton("process", "Processar Dados"),
+                            actionButton("plot_map", "Plotar Mapa"),
+                            br(),
+                            uiOutput("progress_ui")
+                        ),
+                        mainPanel(
+                            DTOutput("contents"),
+                            leafletOutput("map", height = 500),
+                            verbatimTextOutput("dynOutput")
+                        )
+                    )
+                ),
+                # Aba Report
+                tabItem(
+                    tabName = "report",
+                    fluidRow(
+                        uiOutput("value_boxes")
+                    )
+                ),
+                # Aba PCA
+                tabItem(
+                    tabName = "pca",
+                    fluidRow(
+                        column(4, 
+                               selectizeInput("pca_columns_n_species", 
+                                              "Selecione colunas de dynamics$n_species:",
+                                              choices = c("n0", "survivor", "death", "recruitment", "n1", 
+                                                          "death_rate", "recruitment_rate", 
+                                                          "net_change_rate", "turn"),
+                                              selected = NULL, 
+                                              multiple = TRUE),
+                               selectizeInput("pca_columns_basal_area_species", 
+                                              "Selecione colunas de dynamics$basal_area_species:",
+                                              choices = c("BA_0", "AGB_0", "sur_gain", "sur_loss", "BA_m", "BA_r", 
+                                                          "BA_1", "AGB_1", "BA_loss_rate", "BA_gain_rate", 
+                                                          "BA_net_change_rate", "BA_turn"),
+                                              selected = NULL, 
+                                              multiple = TRUE),
+                               actionButton("plot_pca", "Plotar PCA")
+                        ),
+                        
+                        column(8,
+                               plotOutput("pca_plot", height = 500)  # Exibe o gráfico de PCA
+                        )
+                    )
+                )
+            )
+        )
+    )
+)
+
+server <- function(input, output, session) {
+    
+    filedata <- reactive({
+        infile <- input$file1
+        if (is.null(infile)) return(NULL)
+        ext <- tools::file_ext(infile$name)
+        if (ext == "csv") {
+            read.csv2(infile$datapath, stringsAsFactors = FALSE)
+        } else if (ext == "xlsx") {
+            read_excel(infile$datapath)
+        } else {
+            showNotification("Formato de arquivo não suportado. Use .csv ou .xlsx.", type = "error")
+            return(NULL)
+        }
+    })
+    
+    parameters <- reactive({
+        list(
+            coord = c(input$longitude, input$latitude),
+            inv_time = input$inv_time
+        )
+    })
+    
+    dyn_object <- eventReactive(input$process, {
+        data <- filedata()
+        params <- parameters()
+        if (is.null(data)) {
+            showNotification("Carregue um arquivo antes de processar.", type = "error")
+            return(NULL)
+        }
+        
+        withProgress(message = 'Processando dados...', value = 0, {
+            tryCatch({
+                for (i in 1:10) {
+                    incProgress(0.1)
+                    Sys.sleep(0.2)
+                }
+                
+                result <- forest_dyn(data, inv_time = params$inv_time, coord = params$coord)
+                return(result)
+            }, error = function(e) {
+                showNotification(paste("Erro ao processar os dados:", e$message), type = "error")
+                return(NULL)
+            })
+        })
+    })
+    
+    output$contents <- renderDT({
+        data <- filedata()
+        if (is.null(data)) return(NULL)
+        datatable(data, options = list(pageLength = 10, lengthMenu = c(10, 25, 50, 100)))
+    })
+    
+    output$dynOutput <- renderPrint({
+        result <- dyn_object()
+        if (is.null(result)) {
+            "Nenhum resultado disponível. Verifique os dados e tente novamente."
+        } else {
+            result
+        }
+    })
+    
+    output$value_boxes <- renderUI({
+        result <- dyn_object()
+        
+        # Verifica se o resultado está disponível
+        if (is.null(result)) {
+            return(tags$p("Nenhum dado processado. Por favor, vá para a aba Upload e processe os dados."))
+        }
+        
+        report_df <- result$report_df  # Assume que a função forest_dyn retorna um report_df
+        
+        if (is.null(report_df)) {
+            return(tags$p("Relatório não disponível nos dados processados."))
+        }
+        
+        # Organiza as seções
+        sections <- unique(report_df$Section)
+        
+        vbs <- lapply(sections, function(section) {
+            section_data <- report_df[report_df$Section == section, ]
+            
+            # Ajusta os valores arredondando
+            section_data$Value <- sapply(1:nrow(section_data), function(i) {
+                metric <- section_data$Metric[i]
+                value <- section_data$Value[i]
+                
+                if (metric %in% c("Mortality Rate", "Recruitment Rate", "Net Change Rate in n", 
+                                  "Turnover Rate in n", "Basal Area Loss Rate", "Basal Area Gain Rate", 
+                                  "Net Change Rate in BA", "Turnover Rate in BA")) {
+                    return(round(value, 3))  # Arredonda para 3 casas decimais
+                }
+                
+                if (metric %in% c("Basal Area year 1", "Basal Area year 2", "Biomass year 1", "Biomass year 2")) {
+                    return(round(value, 3))  # Arredonda para 3 casas decimais
+                }
+                
+                # Caso contrário, retorna o valor original
+                return(value)
+            })
+            
+            # Cria os "p" com cada valor de Metric, Value e Unit
+            metrics_list <- lapply(1:nrow(section_data), function(i) {
+                p(paste(section_data$Metric[i], ": ", round(section_data$Value[i], 3), " ", section_data$Unit[i]))
+            })
+            
+            # Cria o value_box para cada seção
+            box_title <- paste(section)  # A Section será o título
+            box(
+                title = box_title,  # Exibe a Section como o título
+                width = 12,         # A largura do box é 12 para ocupar toda a linha
+                solidHeader = TRUE,
+                status = "primary",
+                div(
+                    style = "margin-top: 10px; margin-bottom: 10px;",
+                    metrics_list  # As métricas são passadas como detalhes
+                )
+            )
+        })
+        
+        # Organiza os value-boxes verticalmente com margens entre eles
+        fluidRow(
+            column(
+                width = 12,
+                lapply(vbs, function(x) {
+                    div(
+                        style = "margin-bottom: 20px;",  # Margem entre os cards
+                        x
+                    )
+                })
+            )
+        )
+    })
+    
+    
+    observeEvent(input$plot_map, {
+        output$map <- renderLeaflet({
+            leaflet() %>%
+                addTiles() %>%
+                addMarkers(lng = input$longitude, lat = input$latitude, popup = "Localização")
+        })
+    })
+    
+    output$pca_plot <- renderPlot({
+        input$plot_pca  # Reativa o botão para plotar
+
+        isolate({
+            result <- dyn_object()
+            if (is.null(result)) {
+                showNotification("Processe os dados antes de executar a PCA.", type = "error")
+                return(NULL)
+            }
+
+            # Seleciona colunas de interesse
+            n_species_data <- result$dynamics$n_species
+            basal_area_data <- result$dynamics$basal_area_species
+
+            selected_columns <- c(
+                input$pca_columns_n_species,
+                input$pca_columns_basal_area_species
+            )
+
+            pca_data <- data.frame(n_species_data, basal_area_data)[, selected_columns, drop = FALSE]
+
+            if (ncol(pca_data) < 2) {
+                showNotification("Selecione ao menos duas colunas para a PCA.", type = "error")
+                return(NULL)
+            }
+
+            # Realiza a PCA
+            pca_result <- prcomp(pca_data, scale. = TRUE)
+
+            # Cria o biplot
+            fviz_pca_biplot(pca_result,
+                            addEllipses = TRUE,
+                            ellipse.level = 0.95,
+                            ellipse.type = "confidence",
+                            col.var = "red",
+                            label = "var", 
+                            repel = TRUE,
+                            title = NULL) +
+                scale_color_brewer(palette = "Dark2") +
+                theme_minimal()
+        })
+    })
+
+}
+
+shinyApp(ui, server)
