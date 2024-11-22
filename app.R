@@ -11,7 +11,7 @@ library(factoextra)
 ui <- fluidPage(
     dashboardPage(
         skin = "blue",
-        dashboardHeader(title = "Forest Dynamics App",
+        dashboardHeader(title = "forestdynR-Web",
                         titleWidth = 320
                         ),
         dashboardSidebar(
@@ -19,7 +19,7 @@ ui <- fluidPage(
             sidebarMenu(
                 menuItem("Upload", tabName = "upload", icon = icon("upload")),
                 menuItem("Report", tabName = "report", icon = icon("chart-bar")),
-                menuItem("PCA", tabName = "pca", icon = icon("chart-line")) # Nova aba PCA
+                menuItem("PCA", tabName = "pca", icon = icon("chart-line"))
             )
         ),
         dashboardBody(
@@ -44,7 +44,9 @@ ui <- fluidPage(
                         ),
                         mainPanel(
                             DTOutput("contents"),
+                            br(),
                             leafletOutput("map", height = 500),
+                            br(),
                             verbatimTextOutput("dynOutput")
                         )
                     )
@@ -93,8 +95,13 @@ ui <- fluidPage(
                         ),
 
                         column(8,
-                               plotOutput("pca_plot", height = 500)  # Exibe o gráfico de PCA
+                               plotOutput("pca_plot", height = 500),  # Gráfico de PCA (biplot)
+                               br(),
+                               plotOutput("scree_plot", height = 400),  # Scree Plot
+                               br(),
+                               plotOutput("var_contrib_plot", height = 400)  # Contribuição das Variáveis
                         )
+                        
                     )
                 )
             )
@@ -247,52 +254,108 @@ server <- function(input, output, session) {
 
     output$pca_plot <- renderPlot({
         input$plot_pca  # Reativa o botão para plotar
-
+        
         isolate({
             result <- dyn_object()
             if (is.null(result)) {
                 showNotification("Processe os dados antes de executar a PCA.", type = "error")
                 return(NULL)
             }
-
+            
             # Seleciona colunas de interesse
             n_species_data <- result$dynamics$n_species
             basal_area_data <- result$dynamics$basal_area_species
-
+            
             selected_columns <- c(
                 input$pca_columns_n_species,
                 input$pca_columns_basal_area_species
             )
-
+            
             pca_data <- data.frame(n_species_data, basal_area_data)[, selected_columns, drop = FALSE]
-
+            
             if (ncol(pca_data) < 2) {
                 showNotification("Selecione ao menos duas colunas para a PCA.", type = "error")
                 return(NULL)
             }
-
+            
             # Verifica o método de escalonamento selecionado
             scale_option <- as.logical(input$pca_scale)
-
+            
             # Realiza a PCA com a opção de escalonamento
             pca_result <- prcomp(pca_data, scale. = scale_option)
-
+            
             # Armazena os resultados para exportação
             values$pca_result <- pca_result
-
-            # Cria o biplot
-            fviz_pca_biplot(pca_result,
-                            addEllipses = TRUE,
-                            ellipse.level = input$ellipse_conf,
-                            ellipse.type = input$ellipse_type,
-                            col.var = "red",
-                            label = "var",
-                            repel = TRUE,
-                            title = "Biplot da Análise PCA") +
-                scale_color_brewer(palette = "Dark2") +
-                theme_minimal()
+            
+            # Gráfico PCA com pontos para as espécies, sem rótulos
+            fviz_pca_biplot(
+                pca_result,
+                geom = "point",             # Apenas pontos
+                pointshape = 21,           # Forma dos pontos
+                pointsize = 4,             # Tamanho dos pontos
+                fill.ind = "#b7dfb9",      # Cor padrão para os pontos
+                col.var = "cos2",          # Gradiente baseado em cos²
+                gradient.cols = c("#FF4500", "#FF8C00", "#FFD700", "#7FFF00", "#00BFFF", "#1E90FF"),
+                addEllipses = TRUE,        # Adiciona elipses de confiança
+                ellipse.level = input$ellipse_conf,
+                ellipse.type = input$ellipse_type,
+                title = "Biplot da PCA com Espécies"
+            ) +
+                theme_minimal(base_size = 15) +  # Melhor qualidade visual
+                theme(legend.position = "right")  # Move a legenda para a direita
         })
     })
+    
+    
+    
+    
+    output$scree_plot <- renderPlot({
+        input$plot_pca  # Reativa o botão para plotar
+        
+        isolate({
+            result <- dyn_object()
+            if (is.null(result)) {
+                showNotification("Processe os dados antes de executar a PCA.", type = "error")
+                return(NULL)
+            }
+            
+            # Verifica se a PCA foi realizada
+            pca_result <- values$pca_result
+            if (is.null(pca_result)) {
+                return(NULL)
+            }
+            
+            # Scree Plot
+            fviz_eig(pca_result, addlabels = TRUE, barfill = "#b7dfb9", barcolor = "#475957", linecolor = "red") +
+                theme_minimal(base_size = 15) +
+                ggtitle("Scree Plot: Variância Explicada")
+        })
+    })
+    
+    output$var_contrib_plot <- renderPlot({
+        input$plot_pca  # Reativa o botão para plotar
+        
+        isolate({
+            result <- dyn_object()
+            if (is.null(result)) {
+                showNotification("Processe os dados antes de executar a PCA.", type = "error")
+                return(NULL)
+            }
+            
+            # Verifica se a PCA foi realizada
+            pca_result <- values$pca_result
+            if (is.null(pca_result)) {
+                return(NULL)
+            }
+            
+            # Gráfico de Contribuição das Variáveis
+            fviz_cos2(pca_result, choice = "var", axes = 1:2, fill = "#b7dfb9", color = "#475957") +
+                theme_minimal(base_size = 15) +
+                ggtitle("Contribuição das Variáveis (Cos²)")
+        })
+    })
+    
+    
 
     # Armazena os dados da PCA para exportação
     values <- reactiveValues(pca_result = NULL)
@@ -314,32 +377,55 @@ server <- function(input, output, session) {
 
     # Exporta o gráfico da PCA como PDF
     output$download_pca_pdf <- downloadHandler(
-        filename = function() { "pca_plot.pdf" },
+        filename = function() { "pca_plots.pdf" },
         content = function(file) {
             pca_result <- values$pca_result
             if (is.null(pca_result)) {
                 showNotification("Processe a PCA antes de exportar.", type = "error")
                 return(NULL)
             }
-
-            pdf(file, width = 8, height = 6)
-            print(
-                fviz_pca_biplot(
-                    pca_result,
-                    addEllipses = TRUE,
-                    ellipse.level = input$ellipse_conf,
-                    ellipse.type = input$ellipse_type,
-                    col.var = "red",
-                    label = "var",
-                    repel = TRUE,
-                    title = "Biplot da Análise PCA"
-                ) +
-                    scale_color_brewer(palette = "Dark2") +
-                    theme_minimal()
-            )
+            
+            pdf(file, width = 10, height = 8)
+            
+            # Gráfico 1: Scree Plot
+            scree_plot <- fviz_eig(pca_result, 
+                                   addlabels = TRUE, 
+                                   barfill = "#b7dfb9", 
+                                   barcolor = "#475957", 
+                                   linecolor = "red", 
+                                   title = "Scree Plot: Variância Explicada")
+            print(scree_plot)
+            
+            # Gráfico 2: Contribuição das Variáveis
+            var_contrib_plot <- fviz_cos2(pca_result, 
+                                          choice = "var", 
+                                          axes = 1:2, 
+                                          fill = "#b7dfb9", 
+                                          color = "#475957", 
+                                          title = "Contribuição das Variáveis (Cos²)")
+            print(var_contrib_plot)
+            
+            # Gráfico 3: Biplot da PCA
+            biplot <- fviz_pca_biplot(pca_result,
+                                      geom = "point",
+                                      pointshape = 21,
+                                      pointsize = 4,
+                                      fill.ind = "#b7dfb9",
+                                      col.var = "cos2",
+                                      gradient.cols = c("#FF4500", "#FF8C00", "#FFD700", "#7FFF00", "#00BFFF", "#1E90FF"),
+                                      addEllipses = TRUE,
+                                      ellipse.level = input$ellipse_conf,
+                                      ellipse.type = input$ellipse_type,
+                                      title = "Biplot da PCA com Espécies") +
+                theme_minimal(base_size = 15) +
+                theme(legend.position = "right")
+            print(biplot)
+            
             dev.off()
         }
     )
+    
+    
 
 }
 
