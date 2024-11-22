@@ -10,8 +10,12 @@ library(factoextra)
 
 ui <- fluidPage(
     dashboardPage(
-        dashboardHeader(title = "Forest Dynamics App"),
+        skin = "blue",
+        dashboardHeader(title = "Forest Dynamics App",
+                        titleWidth = 320
+                        ),
         dashboardSidebar(
+            width = 320,
             sidebarMenu(
                 menuItem("Upload", tabName = "upload", icon = icon("upload")),
                 menuItem("Report", tabName = "report", icon = icon("chart-bar")),
@@ -19,6 +23,9 @@ ui <- fluidPage(
             )
         ),
         dashboardBody(
+            tags$head(
+                tags$link(rel = "stylesheet", type = "text/css", href = "custom.css")
+            ),
             tabItems(
                 # Aba Upload
                 tabItem(
@@ -53,24 +60,38 @@ ui <- fluidPage(
                 tabItem(
                     tabName = "pca",
                     fluidRow(
-                        column(4, 
-                               selectizeInput("pca_columns_n_species", 
+                        column(4,
+                               selectizeInput("pca_columns_n_species",
                                               "Selecione colunas de dynamics$n_species:",
-                                              choices = c("n0", "survivor", "death", "recruitment", "n1", 
-                                                          "death_rate", "recruitment_rate", 
+                                              choices = c("death_rate", "recruitment_rate",
                                                           "net_change_rate", "turn"),
-                                              selected = NULL, 
+                                              selected = NULL,
                                               multiple = TRUE),
-                               selectizeInput("pca_columns_basal_area_species", 
+                               selectizeInput("pca_columns_basal_area_species",
                                               "Selecione colunas de dynamics$basal_area_species:",
-                                              choices = c("BA_0", "AGB_0", "sur_gain", "sur_loss", "BA_m", "BA_r", 
-                                                          "BA_1", "AGB_1", "BA_loss_rate", "BA_gain_rate", 
+                                              choices = c("BA_loss_rate", "BA_gain_rate",
                                                           "BA_net_change_rate", "BA_turn"),
-                                              selected = NULL, 
+                                              selected = NULL,
                                               multiple = TRUE),
-                               actionButton("plot_pca", "Plotar PCA")
+                               radioButtons("pca_scale",
+                                            "Escalonamento dos Dados:",
+                                            choices = list(
+                                                "Com escalonamento (recomendado para variáveis com unidades diferentes)" = TRUE,
+                                                "Sem escalonamento (preserva unidades originais)" = FALSE
+                                            ),
+                                            inline = FALSE),
+                               sliderInput("ellipse_conf",
+                                           "Nível de Confiança da Elipse:",
+                                           min = 0.5, max = 0.99, value = 0.95, step = 0.01),
+                               selectInput("ellipse_type",
+                                           "Tipo de Elipse:",
+                                           choices = c("confidence" = "confidence", "convex" = "convex")),
+                               actionButton("plot_pca", "Plotar PCA"),
+                               br(), br(),
+                               downloadButton("download_pca_csv", "Exportar PCA (.csv)", class = "btn-primary"),
+                               downloadButton("download_pca_pdf", "Exportar PCA (.pdf)", class = "btn-success")
                         ),
-                        
+
                         column(8,
                                plotOutput("pca_plot", height = 500)  # Exibe o gráfico de PCA
                         )
@@ -82,7 +103,7 @@ ui <- fluidPage(
 )
 
 server <- function(input, output, session) {
-    
+
     filedata <- reactive({
         infile <- input$file1
         if (is.null(infile)) return(NULL)
@@ -96,14 +117,14 @@ server <- function(input, output, session) {
             return(NULL)
         }
     })
-    
+
     parameters <- reactive({
         list(
             coord = c(input$longitude, input$latitude),
             inv_time = input$inv_time
         )
     })
-    
+
     dyn_object <- eventReactive(input$process, {
         data <- filedata()
         params <- parameters()
@@ -111,14 +132,14 @@ server <- function(input, output, session) {
             showNotification("Carregue um arquivo antes de processar.", type = "error")
             return(NULL)
         }
-        
+
         withProgress(message = 'Processando dados...', value = 0, {
             tryCatch({
                 for (i in 1:10) {
                     incProgress(0.1)
                     Sys.sleep(0.2)
                 }
-                
+
                 result <- forest_dyn(data, inv_time = params$inv_time, coord = params$coord)
                 return(result)
             }, error = function(e) {
@@ -127,13 +148,13 @@ server <- function(input, output, session) {
             })
         })
     })
-    
+
     output$contents <- renderDT({
         data <- filedata()
         if (is.null(data)) return(NULL)
         datatable(data, options = list(pageLength = 10, lengthMenu = c(10, 25, 50, 100)))
     })
-    
+
     output$dynOutput <- renderPrint({
         result <- dyn_object()
         if (is.null(result)) {
@@ -142,51 +163,51 @@ server <- function(input, output, session) {
             result
         }
     })
-    
+
     output$value_boxes <- renderUI({
         result <- dyn_object()
-        
+
         # Verifica se o resultado está disponível
         if (is.null(result)) {
             return(tags$p("Nenhum dado processado. Por favor, vá para a aba Upload e processe os dados."))
         }
-        
+
         report_df <- result$report_df  # Assume que a função forest_dyn retorna um report_df
-        
+
         if (is.null(report_df)) {
             return(tags$p("Relatório não disponível nos dados processados."))
         }
-        
+
         # Organiza as seções
         sections <- unique(report_df$Section)
-        
+
         vbs <- lapply(sections, function(section) {
             section_data <- report_df[report_df$Section == section, ]
-            
+
             # Ajusta os valores arredondando
             section_data$Value <- sapply(1:nrow(section_data), function(i) {
                 metric <- section_data$Metric[i]
                 value <- section_data$Value[i]
-                
-                if (metric %in% c("Mortality Rate", "Recruitment Rate", "Net Change Rate in n", 
-                                  "Turnover Rate in n", "Basal Area Loss Rate", "Basal Area Gain Rate", 
+
+                if (metric %in% c("Mortality Rate", "Recruitment Rate", "Net Change Rate in n",
+                                  "Turnover Rate in n", "Basal Area Loss Rate", "Basal Area Gain Rate",
                                   "Net Change Rate in BA", "Turnover Rate in BA")) {
                     return(round(value, 3))  # Arredonda para 3 casas decimais
                 }
-                
+
                 if (metric %in% c("Basal Area year 1", "Basal Area year 2", "Biomass year 1", "Biomass year 2")) {
                     return(round(value, 3))  # Arredonda para 3 casas decimais
                 }
-                
+
                 # Caso contrário, retorna o valor original
                 return(value)
             })
-            
+
             # Cria os "p" com cada valor de Metric, Value e Unit
             metrics_list <- lapply(1:nrow(section_data), function(i) {
                 p(paste(section_data$Metric[i], ": ", round(section_data$Value[i], 3), " ", section_data$Unit[i]))
             })
-            
+
             # Cria o value_box para cada seção
             box_title <- paste(section)  # A Section será o título
             box(
@@ -200,7 +221,7 @@ server <- function(input, output, session) {
                 )
             )
         })
-        
+
         # Organiza os value-boxes verticalmente com margens entre eles
         fluidRow(
             column(
@@ -214,8 +235,8 @@ server <- function(input, output, session) {
             )
         )
     })
-    
-    
+
+
     observeEvent(input$plot_map, {
         output$map <- renderLeaflet({
             leaflet() %>%
@@ -223,7 +244,7 @@ server <- function(input, output, session) {
                 addMarkers(lng = input$longitude, lat = input$latitude, popup = "Localização")
         })
     })
-    
+
     output$pca_plot <- renderPlot({
         input$plot_pca  # Reativa o botão para plotar
 
@@ -250,23 +271,77 @@ server <- function(input, output, session) {
                 return(NULL)
             }
 
-            # Realiza a PCA
-            pca_result <- prcomp(pca_data, scale. = TRUE)
+            # Verifica o método de escalonamento selecionado
+            scale_option <- as.logical(input$pca_scale)
+
+            # Realiza a PCA com a opção de escalonamento
+            pca_result <- prcomp(pca_data, scale. = scale_option)
+
+            # Armazena os resultados para exportação
+            values$pca_result <- pca_result
 
             # Cria o biplot
             fviz_pca_biplot(pca_result,
                             addEllipses = TRUE,
-                            ellipse.level = 0.95,
-                            ellipse.type = "confidence",
+                            ellipse.level = input$ellipse_conf,
+                            ellipse.type = input$ellipse_type,
                             col.var = "red",
-                            label = "var", 
+                            label = "var",
                             repel = TRUE,
-                            title = NULL) +
+                            title = "Biplot da Análise PCA") +
                 scale_color_brewer(palette = "Dark2") +
                 theme_minimal()
         })
     })
 
+    # Armazena os dados da PCA para exportação
+    values <- reactiveValues(pca_result = NULL)
+
+    # Exporta os resultados da PCA como CSV
+    output$download_pca_csv <- downloadHandler(
+        filename = function() { "pca_results.csv" },
+        content = function(file) {
+            pca_result <- values$pca_result
+            if (is.null(pca_result)) {
+                showNotification("Processe a PCA antes de exportar.", type = "error")
+                return(NULL)
+            }
+
+            # Salva as componentes principais
+            write.csv(pca_result$x, file, row.names = TRUE)
+        }
+    )
+
+    # Exporta o gráfico da PCA como PDF
+    output$download_pca_pdf <- downloadHandler(
+        filename = function() { "pca_plot.pdf" },
+        content = function(file) {
+            pca_result <- values$pca_result
+            if (is.null(pca_result)) {
+                showNotification("Processe a PCA antes de exportar.", type = "error")
+                return(NULL)
+            }
+
+            pdf(file, width = 8, height = 6)
+            print(
+                fviz_pca_biplot(
+                    pca_result,
+                    addEllipses = TRUE,
+                    ellipse.level = input$ellipse_conf,
+                    ellipse.type = input$ellipse_type,
+                    col.var = "red",
+                    label = "var",
+                    repel = TRUE,
+                    title = "Biplot da Análise PCA"
+                ) +
+                    scale_color_brewer(palette = "Dark2") +
+                    theme_minimal()
+            )
+            dev.off()
+        }
+    )
+
 }
 
 shinyApp(ui, server)
+
