@@ -1,0 +1,12 @@
+name: forestdynR
+title: forestdynR
+username: arslabadack
+account: arslabadack
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 13429410
+bundleId: 9404909
+url: https://arslabadack.shinyapps.io/forestdynR/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE

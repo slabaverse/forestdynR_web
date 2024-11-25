@@ -19,7 +19,10 @@ ui <- fluidPage(
             sidebarMenu(
                 menuItem("Upload", tabName = "upload", icon = icon("upload")),
                 menuItem("Report", tabName = "report", icon = icon("chart-bar")),
-                menuItem("PCA", tabName = "pca", icon = icon("chart-line"))
+                menuItem("PCA", icon = icon("chart-line"),
+                         menuSubItem("PCA spp", tabName = "pca_spp"),
+                         menuSubItem("PCA par", tabName = "pca_par")
+                )
             )
         ),
         dashboardBody(
@@ -58,19 +61,19 @@ ui <- fluidPage(
                         uiOutput("value_boxes")
                     )
                 ),
-                # Aba PCA
+                # Aba PCA spp
                 tabItem(
-                    tabName = "pca",
+                    tabName = "pca_spp",
                     fluidRow(
                         column(4,
                                selectizeInput("pca_columns_n_species",
-                                              "Selecione colunas de dynamics$n_species:",
+                                              "Selecione colunas (n - species):",
                                               choices = c("death_rate", "recruitment_rate",
                                                           "net_change_rate", "turn"),
                                               selected = NULL,
                                               multiple = TRUE),
                                selectizeInput("pca_columns_basal_area_species",
-                                              "Selecione colunas de dynamics$basal_area_species:",
+                                              "Selecione colunas (basal area - species):",
                                               choices = c("BA_loss_rate", "BA_gain_rate",
                                                           "BA_net_change_rate", "BA_turn"),
                                               selected = NULL,
@@ -88,12 +91,12 @@ ui <- fluidPage(
                                selectInput("ellipse_type",
                                            "Tipo de Elipse:",
                                            choices = c("confidence" = "confidence", "convex" = "convex")),
-                               actionButton("plot_pca", "Plotar PCA"),
+                               actionButton("plot_pca_spp", "Plotar PCA"),
                                br(), br(),
                                downloadButton("download_pca_csv", "Exportar PCA (.csv)", class = "btn-primary"),
                                downloadButton("download_pca_pdf", "Exportar PCA (.pdf)", class = "btn-success")
                         ),
-
+                        
                         column(8,
                                plotOutput("pca_plot", height = 500),  # Gráfico de PCA (biplot)
                                br(),
@@ -101,9 +104,56 @@ ui <- fluidPage(
                                br(),
                                plotOutput("var_contrib_plot", height = 400)  # Contribuição das Variáveis
                         )
-                        
+                    )
+                ),
+                
+                # Aba PCA par (inicialmente vazia ou com placeholders)
+                # Aba PCA par
+                tabItem(
+                    tabName = "pca_par",
+                    fluidRow(
+                        column(4,
+                               selectizeInput("pca_columns_n_plot",
+                                              "Selecione colunas (n - plot):",
+                                              choices = c("death_rate", "recruitment_rate",
+                                                          "net_change_rate", "turn"),
+                                              selected = NULL,
+                                              multiple = TRUE),
+                               selectizeInput("pca_columns_basal_area_plot",
+                                              "Selecione colunas (basal area - plot):",
+                                              choices = c("BA_loss_rate", "BA_gain_rate",
+                                                          "BA_net_change_rate", "BA_turn"),
+                                              selected = NULL,
+                                              multiple = TRUE),
+                               radioButtons("pca_scale_par",
+                                            "Escalonamento dos Dados:",
+                                            choices = list(
+                                                "Com escalonamento (recomendado para variáveis com unidades diferentes)" = TRUE,
+                                                "Sem escalonamento (preserva unidades originais)" = FALSE
+                                            ),
+                                            inline = FALSE),
+                               sliderInput("ellipse_conf_par",
+                                           "Nível de Confiança da Elipse:",
+                                           min = 0.5, max = 0.99, value = 0.95, step = 0.01),
+                               selectInput("ellipse_type_par",
+                                           "Tipo de Elipse:",
+                                           choices = c("confidence" = "confidence", "convex" = "convex")),
+                               actionButton("plot_pca_par", "Plotar PCA"),
+                               br(), br(),
+                               downloadButton("download_pca_par_csv", "Exportar PCA (.csv)", class = "btn-primary"),
+                               downloadButton("download_pca_par_pdf", "Exportar PCA (.pdf)", class = "btn-success")
+                        ),
+                        column(8,
+                               plotOutput("pca_plot_par", height = 500),  # Gráfico de PCA (biplot)
+                               br(),
+                               plotOutput("scree_plot_par", height = 400),  # Scree Plot
+                               br(),
+                               plotOutput("var_contrib_plot_par", height = 400)  # Contribuição das Variáveis
+                        )
                     )
                 )
+                
+                
             )
         )
     )
@@ -243,7 +293,6 @@ server <- function(input, output, session) {
         )
     })
 
-
     observeEvent(input$plot_map, {
         output$map <- renderLeaflet({
             leaflet() %>%
@@ -253,8 +302,8 @@ server <- function(input, output, session) {
     })
 
     output$pca_plot <- renderPlot({
-        input$plot_pca  # Reativa o botão para plotar
-        
+        input$plot_pca_spp  # Reativa o botão para plotar
+
         isolate({
             result <- dyn_object()
             if (is.null(result)) {
@@ -306,11 +355,9 @@ server <- function(input, output, session) {
         })
     })
     
-    
-    
-    
+ 
     output$scree_plot <- renderPlot({
-        input$plot_pca  # Reativa o botão para plotar
+        input$plot_pca_spp  # Reativa o botão para plotar
         
         isolate({
             result <- dyn_object()
@@ -333,7 +380,7 @@ server <- function(input, output, session) {
     })
     
     output$var_contrib_plot <- renderPlot({
-        input$plot_pca  # Reativa o botão para plotar
+        input$plot_pca_spp  # Reativa o botão para plotar
         
         isolate({
             result <- dyn_object()
@@ -355,14 +402,96 @@ server <- function(input, output, session) {
         })
     })
     
+    output$pca_plot_par <- renderPlot({
+        input$plot_pca_par  # Reativa o botão para plotar
+        
+        isolate({
+            result <- dyn_object()
+            if (is.null(result)) {
+                showNotification("Processe os dados antes de executar a PCA.", type = "error")
+                return(NULL)
+            }
+            
+            # Seleciona colunas de interesse
+            n_plot_data <- result$dynamics$n_plot
+            basal_area_plot_data <- result$dynamics$basal_area_plot
+            
+            selected_columns <- c(
+                input$pca_columns_n_plot,
+                input$pca_columns_basal_area_plot
+            )
+            
+            pca_data <- data.frame(n_plot_data, basal_area_plot_data)[, selected_columns, drop = FALSE]
+            
+            if (ncol(pca_data) < 2) {
+                showNotification("Selecione ao menos duas colunas para a PCA.", type = "error")
+                return(NULL)
+            }
+            
+            # Verifica o método de escalonamento selecionado
+            scale_option <- as.logical(input$pca_scale_par)
+            
+            # Realiza a PCA com a opção de escalonamento
+            pca_result_par <- prcomp(pca_data, scale. = scale_option)
+            
+            # Armazena os resultados para exportação
+            values$pca_result_par <- pca_result_par
+            
+            # Gráfico PCA com pontos para os plots, sem rótulos
+            fviz_pca_biplot(
+                pca_result_par,
+                geom = "point",             # Apenas pontos
+                pointshape = 21,           # Forma dos pontos
+                pointsize = 4,             # Tamanho dos pontos
+                fill.ind = "#b7dfb9",      # Cor padrão para os pontos
+                col.var = "cos2",          # Gradiente baseado em cos²
+                gradient.cols = c("#FF4500", "#FF8C00", "#FFD700", "#7FFF00", "#00BFFF", "#1E90FF"),
+                addEllipses = TRUE,        # Adiciona elipses de confiança
+                ellipse.level = input$ellipse_conf_par,
+                ellipse.type = input$ellipse_type_par,
+                title = "Biplot da PCA com Plots"
+            ) +
+                theme_minimal(base_size = 15) +  # Melhor qualidade visual
+                theme(legend.position = "right")  # Move a legenda para a direita
+        })
+    })
+    
+    output$scree_plot_par <- renderPlot({
+        input$plot_pca_par  # Reativa o botão para plotar
+        
+        isolate({
+            pca_result_par <- values$pca_result_par
+            if (is.null(pca_result_par)) return(NULL)
+            
+            # Scree Plot
+            fviz_eig(pca_result_par, addlabels = TRUE, barfill = "#b7dfb9", barcolor = "#475957", linecolor = "red") +
+                theme_minimal(base_size = 15) +
+                ggtitle("Scree Plot: Variância Explicada")
+        })
+    })
+    
+    output$var_contrib_plot_par <- renderPlot({
+        input$plot_pca_par  # Reativa o botão para plotar
+        
+        isolate({
+            pca_result_par <- values$pca_result_par
+            if (is.null(pca_result_par)) return(NULL)
+            
+            # Gráfico de Contribuição das Variáveis
+            fviz_cos2(pca_result_par, choice = "var", axes = 1:2, fill = "#b7dfb9", color = "#475957") +
+                theme_minimal(base_size = 15) +
+                ggtitle("Contribuição das Variáveis (Cos²)")
+        })
+    })
     
 
     # Armazena os dados da PCA para exportação
-    values <- reactiveValues(pca_result = NULL)
+    values <- reactiveValues(pca_result = NULL, pca_result_par = NULL)
+    
 
     # Exporta os resultados da PCA como CSV
     output$download_pca_csv <- downloadHandler(
-        filename = function() { "pca_results.csv" },
+        filename = function() { "pca_spp_results.csv" },
         content = function(file) {
             pca_result <- values$pca_result
             if (is.null(pca_result)) {
@@ -377,7 +506,7 @@ server <- function(input, output, session) {
 
     # Exporta o gráfico da PCA como PDF
     output$download_pca_pdf <- downloadHandler(
-        filename = function() { "pca_plots.pdf" },
+        filename = function() { "pca_spp_graph.pdf" },
         content = function(file) {
             pca_result <- values$pca_result
             if (is.null(pca_result)) {
@@ -424,9 +553,69 @@ server <- function(input, output, session) {
             dev.off()
         }
     )
+    output$download_pca_par_csv <- downloadHandler(
+        filename = function() { "pca_par_results.csv" },
+        content = function(file) {
+            pca_result_par <- values$pca_result_par
+            if (is.null(pca_result_par)) {
+                showNotification("Processe a PCA antes de exportar.", type = "error")
+                return(NULL)
+            }
+            
+            # Salva as componentes principais
+            write.csv(pca_result_par$x, file, row.names = TRUE)
+        }
+    )
     
+    output$download_pca_par_pdf <- downloadHandler(
+        filename = function() { "pca_par_plots.pdf" },
+        content = function(file) {
+            pca_result_par <- values$pca_result_par
+            if (is.null(pca_result_par)) {
+                showNotification("Processe a PCA antes de exportar.", type = "error")
+                return(NULL)
+            }
+            
+            pdf(file, width = 10, height = 8)
+            
+            # Gráfico 1: Scree Plot
+            scree_plot <- fviz_eig(pca_result_par, 
+                                   addlabels = TRUE, 
+                                   barfill = "#b7dfb9", 
+                                   barcolor = "#475957", 
+                                   linecolor = "red", 
+                                   title = "Scree Plot: Variância Explicada")
+            print(scree_plot)
+            
+            # Gráfico 2: Contribuição das Variáveis
+            var_contrib_plot <- fviz_cos2(pca_result_par, 
+                                          choice = "var", 
+                                          axes = 1:2, 
+                                          fill = "#b7dfb9", 
+                                          color = "#475957", 
+                                          title = "Contribuição das Variáveis (Cos²)")
+            print(var_contrib_plot)
+            
+            # Gráfico 3: Biplot da PCA
+            biplot <- fviz_pca_biplot(pca_result_par,
+                                      geom = "point",
+                                      pointshape = 21,
+                                      pointsize = 4,
+                                      fill.ind = "#b7dfb9",
+                                      col.var = "cos2",
+                                      gradient.cols = c("#FF4500", "#FF8C00", "#FFD700", "#7FFF00", "#00BFFF", "#1E90FF"),
+                                      addEllipses = TRUE,
+                                      ellipse.level = input$ellipse_conf_par,
+                                      ellipse.type = input$ellipse_type_par,
+                                      title = "Biplot da PCA com Plots") +
+                theme_minimal(base_size = 15) +
+                theme(legend.position = "right")
+            print(biplot)
+            
+            dev.off()
+        }
+    )
     
-
 }
 
 shinyApp(ui, server)
