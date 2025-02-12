@@ -1,0 +1,113 @@
+$dynamics
+$dynamics$n_plot
+  n0 survivor death recruitment n1 death_rate recruitment_rate net_change_rate turn
+1 46       42     4           3 45       1.80             1.37           -0.44 1.59
+2 35       34     1           1 35       0.58             0.58            0.00 0.58
+
+$dynamics$n_species
+                                                          n0 survivor death recruitment n1 death_rate recruitment_rate net_change_rate turn
+Allophylus edulis (A.St.-Hil., Cambess. & A.Juss.) Radlk.  1        1     0           0  1       0.00             0.00            0.00 0.00
+Araucaria angustifolia (Bertol.) Kuntze                    3        3     0           1  4       0.00             5.59            5.92 2.80
+Calyptranthes concinna DC.                                 4        4     0           0  4       0.00             0.00            0.00 0.00
+Casearia decandra Jacq.                                    7        4     3           2  6      10.59             7.79           -3.04 9.19
+Casearia obliqua Spreng.                                   1        1     0           0  1       0.00             0.00            0.00 0.00
+Cupania vernalis Cambess.                                  4        4     0           1  5       0.00             4.36            4.56 2.18
+Dasyphyllum spinescens (Less.) Cabrera                     1        1     0           0  1       0.00             0.00            0.00 0.00
+Drimys brasiliensis Miers                                  1        1     0           0  1       0.00             0.00            0.00 0.00
+Duranta vestita Cham.                                      2        2     0           0  2       0.00             0.00            0.00 0.00
+Erythroxylum deciduum A.St.-Hil.                           1        1     0           0  1       0.00             0.00            0.00 0.00
+Eugenia pluriflora DC.                                     5        5     0           0  5       0.00             0.00            0.00 0.00
+Ilex theezans Mart. ex Reissek                             1        1     0           0  1       0.00             0.00            0.00 0.00
+Jacaranda puberula Cham.                                  13       12     1           0 12       1.59             0.00           -1.59 0.79
+Lamanonia ternata Vell.                                    1        1     0           0  1       0.00             0.00            0.00 0.00
+Lithraea brasiliensis Marchand                             5        5     0           0  5       0.00             0.00            0.00 0.00
+Matayba elaeagnoides Radlk.                                3        3     0           0  3       0.00             0.00            0.00 0.00
+Maytenus dasyclada Mart.                                   1        1     0           0  1       0.00             0.00            0.00 0.00
+Moquiniastrum polymorphum (Less.) G. Sancho                4        4     0           0  4       0.00             0.00            0.00 0.00
+Myrcia laruotteana Cambess.                                1        1     0           0  1       0.00             0.00            0.00 0.00
+Myrsine umbellata Mart.                                    6        5     1           0  5       3.58             0.00           -3.58 1.79
+Ocotea pulchella Mart.                                     3        3     0           0  3       0.00             0.00            0.00 0.00
+Podocarpus lambertii Klotzsch ex Endl.                     7        7     0           0  7       0.00             0.00            0.00 0.00
+Scutia buxifolia Reissek                                   1        1     0           0  1       0.00             0.00            0.00 0.00
+Solanum sanctaecatharinae Dunal                            3        3     0           0  3       0.00             0.00            0.00 0.00
+Zanthoxylum kleinii (R.S.Cowan) P.G.Waterman               2        2     0           0  2       0.00             0.00            0.00 0.00
+
+$dynamics$basal_area_plot
+    BA_0  AGB_0 sur_gain sur_loss BA_m BA_r   BA_1  AGB_1 BA_loss_rate BA_gain_rate BA_net_change_rate BA_turn
+1 0.7342 4.3357   0.0763  -0.0200    0    0 0.7802 4.7101       0.5517       2.0379             1.2232  1.2948
+2 1.1205 7.7123   0.1658  -0.0038    0    0 1.2815 9.0881       0.0674       2.7336             2.7223  1.4005
+
+$dynamics$basal_area_species
+                                                            BA_0  AGB_0 sur_gain sur_loss BA_m BA_r   BA_1  AGB_1 BA_loss_rate BA_gain_rate BA_net_change_rate
+Allophylus edulis (A.St.-Hil., Cambess. & A.Juss.) Radlk. 0.0058 0.0195   0.0002   0.0000    0    0 0.0060 0.0205       0.0000       0.7313             0.0000
+Araucaria angustifolia (Bertol.) Kuntze                   0.1542 0.8626   0.0381   0.0000    0    0 0.1943 1.1332       0.0000       4.2746             5.9224
+Calyptranthes concinna DC.                                0.0191 0.0785   0.0016  -0.0019    0    0 0.0187 0.0734       2.1347       1.7506             0.0000
+Casearia decandra Jacq.                                   0.0276 0.0862   0.0032   0.0000    0    0 0.0218 0.0666       0.0000       3.0870            -3.0360
+Casearia obliqua Spreng.                                  0.0040 0.0117   0.0010   0.0000    0    0 0.0051 0.0157       0.0000       4.4319             0.0000
+Cupania vernalis Cambess.                                 0.1103 0.6360   0.0218  -0.0011    0    0 0.1332 0.8059       0.1935       3.5137             4.5640
+Dasyphyllum spinescens (Less.) Cabrera                    0.3151 2.9125   0.0392   0.0000    0    0 0.3543 3.3539       0.0000       2.3149             0.0000
+Drimys brasiliensis Miers                                 0.0050 0.0104   0.0000  -0.0007    0    0 0.0042 0.0085       3.1123       0.0000             0.0000
+Duranta vestita Cham.                                     0.0092 0.0265   0.0014   0.0000    0    0 0.0106 0.0319       0.0000       2.7850             0.0000
+Erythroxylum deciduum A.St.-Hil.                          0.0466 0.3398   0.0069   0.0000    0    0 0.0535 0.4042       0.0000       2.7389             0.0000
+Eugenia pluriflora DC.                                    0.0276 0.1105   0.0020   0.0000    0    0 0.0296 0.1212       0.0000       1.3638             0.0000
+Ilex theezans Mart. ex Reissek                            0.0069 0.0215   0.0000  -0.0007    0    0 0.0062 0.0188       2.0658       0.0000             0.0000
+Jacaranda puberula Cham.                                  0.1012 0.3522   0.0189   0.0000    0    0 0.1170 0.4301       0.0000       3.4610            -1.5881
+Lamanonia ternata Vell.                                   0.0021 0.0052   0.0000   0.0000    0    0 0.0021 0.0051       0.3028       0.0000             0.0000
+Lithraea brasiliensis Marchand                            0.1775 1.5421   0.0274  -0.0003    0    0 0.2047 1.8390       0.0295       2.8368             0.0000
+Matayba elaeagnoides Radlk.                               0.0733 0.4762   0.0047  -0.0066    0    0 0.0713 0.4532       1.8669       1.3405             0.0000
+Maytenus dasyclada Mart.                                  0.0100 0.0427   0.0000  -0.0054    0    0 0.0046 0.0156      14.3771       0.0000             0.0000
+Moquiniastrum polymorphum (Less.) G. Sancho               0.2310 1.5133   0.0140  -0.0068    0    0 0.2383 1.5687       0.5951       1.2070             0.0000
+Myrcia laruotteana Cambess.                               0.0200 0.1179   0.0000  -0.0002    0    0 0.0198 0.1165       0.1871       0.0000             0.0000
+Myrsine umbellata Mart.                                   0.0660 0.3390   0.0065   0.0000    0    0 0.0691 0.3695       0.0000       1.9650            -3.5807
+Ocotea pulchella Mart.                                    0.2639 1.8855   0.0333   0.0000    0    0 0.2972 2.1866       0.0000       2.3462             0.0000
+Podocarpus lambertii Klotzsch ex Endl.                    0.1295 0.4894   0.0115  -0.0001    0    0 0.1409 0.5455       0.0218       1.6906             0.0000
+Scutia buxifolia Reissek                                  0.0077 0.0385   0.0010   0.0000    0    0 0.0087 0.0452       0.0000       2.4622             0.0000
+Solanum sanctaecatharinae Dunal                           0.0368 0.1200   0.0093   0.0000    0    0 0.0462 0.1584       0.0000       4.4114             0.0000
+Zanthoxylum kleinii (R.S.Cowan) P.G.Waterman              0.0044 0.0103   0.0001   0.0000    0    0 0.0045 0.0108       0.0000       0.5954             0.0000
+                                                          BA_turn
+Allophylus edulis (A.St.-Hil., Cambess. & A.Juss.) Radlk.  0.0000
+Araucaria angustifolia (Bertol.) Kuntze                    2.7956
+Calyptranthes concinna DC.                                 0.0000
+Casearia decandra Jacq.                                    9.1890
+Casearia obliqua Spreng.                                   0.0000
+Cupania vernalis Cambess.                                  2.1824
+Dasyphyllum spinescens (Less.) Cabrera                     0.0000
+Drimys brasiliensis Miers                                  0.0000
+Duranta vestita Cham.                                      0.0000
+Erythroxylum deciduum A.St.-Hil.                           0.0000
+Eugenia pluriflora DC.                                     0.0000
+Ilex theezans Mart. ex Reissek                             0.0000
+Jacaranda puberula Cham.                                   0.7941
+Lamanonia ternata Vell.                                    0.0000
+Lithraea brasiliensis Marchand                             0.0000
+Matayba elaeagnoides Radlk.                                0.0000
+Maytenus dasyclada Mart.                                   0.0000
+Moquiniastrum polymorphum (Less.) G. Sancho                0.0000
+Myrcia laruotteana Cambess.                                0.0000
+Myrsine umbellata Mart.                                    1.7904
+Ocotea pulchella Mart.                                     0.0000
+Podocarpus lambertii Klotzsch ex Endl.                     0.0000
+Scutia buxifolia Reissek                                   0.0000
+Solanum sanctaecatharinae Dunal                            0.0000
+Zanthoxylum kleinii (R.S.Cowan) P.G.Waterman               0.0000
+
+
+$report_df
+         Section                Metric      Value    Unit
+1       Richness       Richness year 1 25.0000000 species
+2       Richness       Richness year 2 25.0000000 species
+3      Abundance      Abundance year 1 81.0000000     ind
+4      Abundance      Abundance year 2 80.0000000     ind
+5  Dynamics Rate        Mortality Rate  1.2662313  % year
+6  Dynamics Rate      Recruitment Rate  1.0206218  % year
+7  Dynamics Rate  Net Change Rate in n -0.2481420  % year
+8  Dynamics Rate    Turnover Rate in n  1.1434265  % year
+9     Basal Area     Basal Area year 1  1.8547000      m2
+10    Basal Area     Basal Area year 2  2.0617000      m2
+11    Basal Area  Basal Area Loss Rate  0.2579729  % year
+12    Basal Area  Basal Area Gain Rate  2.4673349  % year
+13    Basal Area Net Change Rate in BA  2.1387080  % year
+14    Basal Area   Turnover Rate in BA  1.3626539  % year
+15       Biomass        Biomass year 1 12.0480000    tons
+16       Biomass        Biomass year 2 13.7982000    tons
+

@@ -1,3 +1,7 @@
+if (!requireNamespace("httr2", quietly = TRUE)) {
+    install.packages("httr2")
+}
+
 library(shiny)
 library(readxl)
 library(forestdynR)
@@ -6,20 +10,21 @@ library(DT)
 library(leaflet)
 library(ggplot2)
 library(factoextra)
+library(rmarkdown)
+library(pagedown)
+
 
 
 ui <- fluidPage(
     dashboardPage(
         skin = "blue",
-        dashboardHeader(title = "forestdynR-Web",
-                        titleWidth = 320
-                        ),
+        dashboardHeader(title = "forestdynR-Web", titleWidth = 320),
         dashboardSidebar(
             width = 320,
             sidebarMenu(
                 menuItem("Upload", tabName = "upload", icon = icon("upload")),
                 menuItem("Report", tabName = "report", icon = icon("chart-bar")),
-                menuItem("PCA", icon = icon("chart-line"),
+                menuItem("PCA", icon = icon("chart-line"),  # Restaurar a aba PCA
                          menuSubItem("PCA spp", tabName = "pca_spp"),
                          menuSubItem("PCA par", tabName = "pca_par")
                 )
@@ -27,7 +32,17 @@ ui <- fluidPage(
         ),
         dashboardBody(
             tags$head(
-                tags$link(rel = "stylesheet", type = "text/css", href = "custom.css")
+                tags$link(rel = "stylesheet", type = "text/css", href = "custom.css"),
+                tags$style(HTML("
+          /* Adicionar margens ao dynOutput */
+          #dynOutput {
+            margin: 20px; /* Margem de 20px em todos os lados */
+            padding: 15px; /* Espaçamento interno */
+            border: 1px solid #ccc; /* Borda cinza */
+            border-radius: 5px; /* Cantos arredondados */
+            background-color: #f9f9f9; /* Fundo cinza claro */
+          }
+        "))
             ),
             tabItems(
                 # Aba Upload
@@ -48,9 +63,7 @@ ui <- fluidPage(
                         mainPanel(
                             DTOutput("contents"),
                             br(),
-                            leafletOutput("map", height = 500),
-                            br(),
-                            verbatimTextOutput("dynOutput")
+                            leafletOutput("map", height = 500)
                         )
                     )
                 ),
@@ -58,7 +71,8 @@ ui <- fluidPage(
                 tabItem(
                     tabName = "report",
                     fluidRow(
-                        uiOutput("value_boxes")
+                        verbatimTextOutput("dynOutput"),  # Exibir o conteúdo de dynOutput
+                        downloadButton("download_report_pdf", "Exportar Report em PDF", class = "btn-primary")  # Botão de download
                     )
                 ),
                 # Aba PCA spp
@@ -96,7 +110,6 @@ ui <- fluidPage(
                                downloadButton("download_pca_csv", "Exportar PCA (.csv)", class = "btn-primary"),
                                downloadButton("download_pca_pdf", "Exportar PCA (.pdf)", class = "btn-success")
                         ),
-                        
                         column(8,
                                plotOutput("pca_plot", height = 500),  # Gráfico de PCA (biplot)
                                br(),
@@ -106,8 +119,6 @@ ui <- fluidPage(
                         )
                     )
                 ),
-                
-                # Aba PCA par (inicialmente vazia ou com placeholders)
                 # Aba PCA par
                 tabItem(
                     tabName = "pca_par",
@@ -152,15 +163,16 @@ ui <- fluidPage(
                         )
                     )
                 )
-                
-                
             )
         )
     )
 )
 
 server <- function(input, output, session) {
-
+    
+    # Variável reativa para armazenar o resultado do processamento
+    values <- reactiveValues(dyn_result = NULL)
+    
     filedata <- reactive({
         infile <- input$file1
         if (is.null(infile)) return(NULL)
@@ -174,125 +186,62 @@ server <- function(input, output, session) {
             return(NULL)
         }
     })
-
+    
     parameters <- reactive({
         list(
             coord = c(input$longitude, input$latitude),
             inv_time = input$inv_time
         )
     })
-
-    dyn_object <- eventReactive(input$process, {
+    
+    observeEvent(input$process, {
         data <- filedata()
         params <- parameters()
+        
         if (is.null(data)) {
             showNotification("Carregue um arquivo antes de processar.", type = "error")
             return(NULL)
         }
-
+        
         withProgress(message = 'Processando dados...', value = 0, {
             tryCatch({
                 for (i in 1:10) {
                     incProgress(0.1)
                     Sys.sleep(0.2)
                 }
-
+                
+                # Processar os dados
                 result <- forest_dyn(data, inv_time = params$inv_time, coord = params$coord)
-                return(result)
+                
+                # Armazenar o resultado na variável reativa
+                values$dyn_result <- result
+                
+                showNotification("Dados processados com sucesso!", type = "message")
             }, error = function(e) {
                 showNotification(paste("Erro ao processar os dados:", e$message), type = "error")
                 return(NULL)
             })
         })
     })
+    
 
     output$contents <- renderDT({
         data <- filedata()
         if (is.null(data)) return(NULL)
         datatable(data, options = list(pageLength = 10, lengthMenu = c(10, 25, 50, 100)))
     })
-
+    
     output$dynOutput <- renderPrint({
-        result <- dyn_object()
+        result <- values$dyn_result  # Acessar a variável reativa
         if (is.null(result)) {
             "Nenhum resultado disponível. Verifique os dados e tente novamente."
         } else {
             result
         }
     })
-
-    output$value_boxes <- renderUI({
-        result <- dyn_object()
-
-        # Verifica se o resultado está disponível
-        if (is.null(result)) {
-            return(tags$p("Nenhum dado processado. Por favor, vá para a aba Upload e processe os dados."))
-        }
-
-        report_df <- result$report_df  # Assume que a função forest_dyn retorna um report_df
-
-        if (is.null(report_df)) {
-            return(tags$p("Relatório não disponível nos dados processados."))
-        }
-
-        # Organiza as seções
-        sections <- unique(report_df$Section)
-
-        vbs <- lapply(sections, function(section) {
-            section_data <- report_df[report_df$Section == section, ]
-
-            # Ajusta os valores arredondando
-            section_data$Value <- sapply(1:nrow(section_data), function(i) {
-                metric <- section_data$Metric[i]
-                value <- section_data$Value[i]
-
-                if (metric %in% c("Mortality Rate", "Recruitment Rate", "Net Change Rate in n",
-                                  "Turnover Rate in n", "Basal Area Loss Rate", "Basal Area Gain Rate",
-                                  "Net Change Rate in BA", "Turnover Rate in BA")) {
-                    return(round(value, 3))  # Arredonda para 3 casas decimais
-                }
-
-                if (metric %in% c("Basal Area year 1", "Basal Area year 2", "Biomass year 1", "Biomass year 2")) {
-                    return(round(value, 3))  # Arredonda para 3 casas decimais
-                }
-
-                # Caso contrário, retorna o valor original
-                return(value)
-            })
-
-            # Cria os "p" com cada valor de Metric, Value e Unit
-            metrics_list <- lapply(1:nrow(section_data), function(i) {
-                p(paste(section_data$Metric[i], ": ", round(section_data$Value[i], 3), " ", section_data$Unit[i]))
-            })
-
-            # Cria o value_box para cada seção
-            box_title <- paste(section)  # A Section será o título
-            box(
-                title = box_title,  # Exibe a Section como o título
-                width = 12,         # A largura do box é 12 para ocupar toda a linha
-                solidHeader = TRUE,
-                status = "primary",
-                div(
-                    style = "margin-top: 10px; margin-bottom: 10px;",
-                    metrics_list  # As métricas são passadas como detalhes
-                )
-            )
-        })
-
-        # Organiza os value-boxes verticalmente com margens entre eles
-        fluidRow(
-            column(
-                width = 12,
-                lapply(vbs, function(x) {
-                    div(
-                        style = "margin-bottom: 20px;",  # Margem entre os cards
-                        x
-                    )
-                })
-            )
-        )
-    })
-
+    
+    outputOptions(output, "dynOutput", suspendWhenHidden = FALSE)
+    
     observeEvent(input$plot_map, {
         output$map <- renderLeaflet({
             leaflet() %>%
@@ -300,12 +249,62 @@ server <- function(input, output, session) {
                 addMarkers(lng = input$longitude, lat = input$latitude, popup = "Localização")
         })
     })
-
+    
+    output$download_report_pdf <- downloadHandler(
+        filename = function() {
+            paste("report_", Sys.Date(), ".pdf", sep = "")  # Nome do arquivo PDF
+        },
+        content = function(file) {
+            # Capturar o conteúdo de dynOutput
+            report_content <- capture.output(print(values$dyn_result))
+            
+            # Criar um arquivo temporário HTML
+            temp_html <- tempfile(fileext = ".html")
+            temp_content <- tempfile(fileext = ".txt")
+            
+            # Salvar o conteúdo de dynOutput em um arquivo temporário
+            writeLines(report_content, temp_content)
+            
+            # Criar o conteúdo HTML com tamanho de fonte menor
+            html_content <- c(
+                "<!DOCTYPE html>",
+                "<html>",
+                "<head>",
+                "<style>",
+                "@page { size: landscape; }",  # Orientação paisagem
+                "body { font-family: Arial, sans-serif; margin: 1cm; font-size: 10px; }",  # Tamanho da fonte (10px)
+                "pre { white-space: pre-wrap; word-wrap: break-word; font-size: 10px; }",  # Tamanho da fonte para conteúdo pré-formatado
+                "</style>",
+                "</head>",
+                "<body>",
+                "<pre>",
+                paste(readLines(temp_content), collapse = "\n"),
+                "</pre>",
+                "</body>",
+                "</html>"
+            )
+            
+            # Salvar o conteúdo HTML no arquivo temporário
+            writeLines(html_content, temp_html)
+            
+            # Renderizar o PDF usando pagedown
+            tryCatch({
+                pagedown::chrome_print(temp_html, output = file)
+            }, error = function(e) {
+                showNotification(paste("Erro ao gerar o PDF:", e$message), type = "error")
+            })
+            
+            # Remover os arquivos temporários
+            file.remove(temp_html)
+            file.remove(temp_content)
+        }
+    )
+    
     output$pca_plot <- renderPlot({
         input$plot_pca_spp  # Reativa o botão para plotar
-
+        
         isolate({
-            result <- dyn_object()
+            result <- values$dyn_result
             if (is.null(result)) {
                 showNotification("Processe os dados antes de executar a PCA.", type = "error")
                 return(NULL)
@@ -355,12 +354,12 @@ server <- function(input, output, session) {
         })
     })
     
- 
+    
     output$scree_plot <- renderPlot({
         input$plot_pca_spp  # Reativa o botão para plotar
         
         isolate({
-            result <- dyn_object()
+            result <- values$dyn_result
             if (is.null(result)) {
                 showNotification("Processe os dados antes de executar a PCA.", type = "error")
                 return(NULL)
@@ -383,7 +382,7 @@ server <- function(input, output, session) {
         input$plot_pca_spp  # Reativa o botão para plotar
         
         isolate({
-            result <- dyn_object()
+            result <- values$dyn_result
             if (is.null(result)) {
                 showNotification("Processe os dados antes de executar a PCA.", type = "error")
                 return(NULL)
@@ -406,7 +405,7 @@ server <- function(input, output, session) {
         input$plot_pca_par  # Reativa o botão para plotar
         
         isolate({
-            result <- dyn_object()
+            result <- values$dyn_result
             if (is.null(result)) {
                 showNotification("Processe os dados antes de executar a PCA.", type = "error")
                 return(NULL)
@@ -484,11 +483,11 @@ server <- function(input, output, session) {
         })
     })
     
-
+    
     # Armazena os dados da PCA para exportação
     values <- reactiveValues(pca_result = NULL, pca_result_par = NULL)
     
-
+    
     # Exporta os resultados da PCA como CSV
     output$download_pca_csv <- downloadHandler(
         filename = function() { "pca_spp_results.csv" },
@@ -498,12 +497,12 @@ server <- function(input, output, session) {
                 showNotification("Processe a PCA antes de exportar.", type = "error")
                 return(NULL)
             }
-
+            
             # Salva as componentes principais
             write.csv(pca_result$x, file, row.names = TRUE)
         }
     )
-
+    
     # Exporta o gráfico da PCA como PDF
     output$download_pca_pdf <- downloadHandler(
         filename = function() { "pca_spp_graph.pdf" },
